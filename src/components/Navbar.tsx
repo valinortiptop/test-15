@@ -1,120 +1,99 @@
+// @ts-nocheck
 // src/components/Navbar.tsx
-import React, { useState, useEffect } from "react";
-import { Zap, Menu, X } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Menu, X, Zap } from "lucide-react";
 
 const navLinks = [
-  { label: "Inicio", href: "#hero" },
-  { label: "Vehículos", href: "#vehicles" },
-  { label: "¿Por qué EV?", href: "#why-ev" },
-  { label: "Tienda", href: "#store" },
-  { label: "Contacto", href: "#contact" },
+  { label: "Home", path: "/" },
+  { label: "Contact", path: "/contact" },
 ];
 
-export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
+function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
-  useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", handler, { passive: true });
-    return () => window.removeEventListener("scroll", handler);
-  }, []);
-
-  const handleNavClick = (href: string) => {
-    setMobileOpen(false);
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  };
+  const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? "bg-navy-900/95 backdrop-blur-md border-b border-neon-green/10 shadow-lg shadow-black/40"
-          : "bg-transparent"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-18 py-4">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
+      <div className="container-max mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <a
-            href="#hero"
-            onClick={(e) => { e.preventDefault(); handleNavClick("#hero"); }}
-            className="flex items-center gap-2 group"
-          >
-            <div className="relative">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-neon-green to-neon-cyan flex items-center justify-center shadow-neon-green group-hover:shadow-neon-cyan transition-all duration-300">
-                <Zap className="w-5 h-5 text-navy-950" fill="currentColor" />
-              </div>
-              <div className="absolute inset-0 rounded-lg bg-neon-green/20 blur-md group-hover:bg-neon-cyan/20 transition-all duration-300" />
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-9 h-9 bg-brand-600 rounded-lg flex items-center justify-center group-hover:bg-brand-700 transition-colors">
+              <Zap className="w-5 h-5 text-white" />
             </div>
-            <span className="font-display font-bold text-xl tracking-tight">
-              <span className="text-white">Volt</span>
-              <span className="text-neon-green glow-green">MX</span>
-            </span>
-          </a>
+            <span className="text-xl font-bold text-gray-900">Test15</span>
+          </Link>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => { e.preventDefault(); handleNavClick(link.href); }}
-                className="text-sm font-medium text-gray-300 hover:text-neon-green transition-colors duration-200 relative group"
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(link.path)
+                    ? "text-brand-700 bg-brand-50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
               >
                 {link.label}
-                <span className="absolute -bottom-1 left-0 w-0 h-px bg-neon-green group-hover:w-full transition-all duration-300" />
-              </a>
+              </Link>
             ))}
           </nav>
 
-          {/* CTA */}
-          <div className="hidden md:flex items-center gap-4">
-            <button
-              onClick={() => handleNavClick("#contact")}
-              className="btn-neon-solid text-xs"
-            >
-              Agenda una prueba
-            </button>
+          {/* Desktop CTA */}
+          <div className="hidden md:flex items-center gap-3">
+            <Link to="/contact" className="btn-primary text-sm px-5 py-2.5">
+              Get in Touch
+            </Link>
           </div>
 
-          {/* Mobile Toggle */}
+          {/* Mobile menu button */}
           <button
-            className="md:hidden text-gray-300 hover:text-neon-green transition-colors"
             onClick={() => setMobileOpen(!mobileOpen)}
+            className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <div
-        className={`md:hidden transition-all duration-300 overflow-hidden ${
-          mobileOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
-        }`}
-      >
-        <div className="bg-navy-900/98 backdrop-blur-md border-t border-neon-green/10 px-4 py-6 space-y-4">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={(e) => { e.preventDefault(); handleNavClick(link.href); }}
-              className="block text-base font-medium text-gray-300 hover:text-neon-green transition-colors duration-200 py-2 border-b border-white/5"
-            >
-              {link.label}
-            </a>
-          ))}
-          <button
-            onClick={() => handleNavClick("#contact")}
-            className="btn-neon-solid w-full text-center mt-4"
-          >
-            Agenda una prueba
-          </button>
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white">
+          <div className="px-4 py-4 space-y-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                onClick={() => setMobileOpen(false)}
+                className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(link.path)
+                    ? "text-brand-700 bg-brand-50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="pt-3">
+              <Link
+                to="/contact"
+                onClick={() => setMobileOpen(false)}
+                className="btn-primary w-full text-sm"
+              >
+                Get in Touch
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }
+
+export default Navbar;

@@ -1,0 +1,5 @@
+-- Uses existing table: contact_messages
+-- Will add:
+  - RLS enable on contact_messages
+  - INSERT policy for anonymous users (so the contact form works without auth)
+  - DROP/CREATE policy pattern for safety

@@ -3,210 +3,66 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --neon-green: #39ff14;
-  --neon-cyan: #00ffff;
-  --navy-950: #020617;
-  --navy-900: #0a0f1e;
-  --navy-800: #0d1530;
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-gray-900 bg-white;
+  }
 }
 
-* {
-  box-sizing: border-box;
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-semibold text-white bg-brand-600 rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-semibold text-brand-700 bg-brand-50 rounded-lg hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all duration-200;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors duration-200;
+  }
+
+  .section-padding {
+    @apply px-4 py-16 sm:px-6 lg:px-8 lg:py-24;
+  }
+
+  .container-max {
+    @apply max-w-7xl mx-auto;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-brand-800;
+  }
+
+  .card {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300;
+  }
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--navy-950);
-  color: #ffffff;
-  font-family: "Inter", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--navy-900);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(57, 255, 20, 0.4);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(57, 255, 20, 0.7);
-}
-
-/* Selection highlight */
-::selection {
-  background: rgba(57, 255, 20, 0.25);
-  color: #ffffff;
-}
-
-/* Neon text utility */
 @layer utilities {
-  .text-neon-green {
-    color: var(--neon-green);
+  .animate-delay-100 {
+    animation-delay: 100ms;
   }
-
-  .text-neon-cyan {
-    color: var(--neon-cyan);
+  .animate-delay-200 {
+    animation-delay: 200ms;
   }
-
-  .glow-green {
-    text-shadow:
-      0 0 10px rgba(57, 255, 20, 0.6),
-      0 0 30px rgba(57, 255, 20, 0.3),
-      0 0 60px rgba(57, 255, 20, 0.15);
+  .animate-delay-300 {
+    animation-delay: 300ms;
   }
-
-  .glow-cyan {
-    text-shadow:
-      0 0 10px rgba(0, 255, 255, 0.6),
-      0 0 30px rgba(0, 255, 255, 0.3);
+  .animate-delay-400 {
+    animation-delay: 400ms;
   }
-
-  .border-neon {
-    border-color: rgba(57, 255, 20, 0.4);
-  }
-
-  .bg-navy-950 {
-    background-color: var(--navy-950);
-  }
-
-  .bg-navy-900 {
-    background-color: var(--navy-900);
-  }
-
-  .bg-navy-800 {
-    background-color: var(--navy-800);
-  }
-
-  .btn-neon {
-    @apply relative px-8 py-3 font-semibold text-sm tracking-widest uppercase transition-all duration-300;
-    color: var(--neon-green);
-    border: 1px solid var(--neon-green);
-    background: transparent;
-    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-  }
-
-  .btn-neon:hover {
-    background: rgba(57, 255, 20, 0.12);
-    box-shadow:
-      0 0 20px rgba(57, 255, 20, 0.4),
-      inset 0 0 20px rgba(57, 255, 20, 0.05);
-  }
-
-  .btn-neon-solid {
-    @apply relative px-8 py-3 font-semibold text-sm tracking-widest uppercase transition-all duration-300;
-    color: #020617;
-    background: var(--neon-green);
-    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
-  }
-
-  .btn-neon-solid:hover {
-    box-shadow:
-      0 0 30px rgba(57, 255, 20, 0.6),
-      0 0 60px rgba(57, 255, 20, 0.2);
-    transform: translateY(-1px);
-  }
-
-  .section-divider {
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(57, 255, 20, 0.4) 30%,
-      rgba(0, 255, 255, 0.4) 70%,
-      transparent 100%
-    );
-  }
-
-  .card-glass {
-    background: rgba(13, 21, 48, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(57, 255, 20, 0.12);
-  }
-
-  .card-glass:hover {
-    border-color: rgba(57, 255, 20, 0.3);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      0 0 20px rgba(57, 255, 20, 0.08);
-  }
-
-  .image-placeholder {
-    background: linear-gradient(
-      135deg,
-      rgba(13, 21, 48, 0.9) 0%,
-      rgba(7, 26, 18, 0.8) 50%,
-      rgba(13, 21, 48, 0.9) 100%
-    );
-    background-size: 200% 200%;
-    animation: shimmer 2.5s ease-in-out infinite;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
-}
-
-@keyframes glow-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 40px rgba(57, 255, 20, 0.6),
-      0 0 80px rgba(57, 255, 20, 0.2);
-  }
-}
-
-/* Google Maps overrides */
-.gm-style .gm-style-iw-c {
-  background-color: var(--navy-800) !important;
-  border: 1px solid rgba(57, 255, 20, 0.4) !important;
-  color: #fff !important;
-  border-radius: 4px !important;
-}
-
-.gm-style .gm-style-iw-t::after {
-  background: var(--navy-800) !important;
-}
-
-.gm-style-iw-d {
-  color: #fff !important;
-}
-
-.gm-ui-hover-effect > span {
-  background-color: rgba(57, 255, 20, 0.8) !important;
 }
