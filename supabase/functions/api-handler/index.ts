@@ -13,17 +13,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const proxyUrl = Deno.env.get("VALINOR_PROXY_URL") ?? "https://htfhprzchvgcbquohgir.supabase.co/functions/v1/api-proxy";
+  const proxyUrl =
+    Deno.env.get("VALINOR_PROXY_URL") ??
+    "https://htfhprzchvgcbquohgir.supabase.co/functions/v1/api-proxy";
   const proxyToken = Deno.env.get("VALINOR_PROXY_TOKEN");
   const googleMapsKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
-
-  if (!proxyToken) {
-    console.error("VALINOR_PROXY_TOKEN is not set");
-    return new Response(
-      JSON.stringify({ error: "Service temporarily unavailable. Proxy token not configured." }),
-      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
 
   let body: Record<string, any>;
   try {
@@ -48,7 +42,7 @@ serve(async (req) => {
   // ─── ACTION: get-maps-key ─────────────────────────────────────────
   if (action === "get-maps-key") {
     if (!googleMapsKey) {
-      console.warn("GOOGLE_MAPS_API_KEY not set, client will use fallback embed");
+      console.warn("GOOGLE_MAPS_API_KEY not set");
       return new Response(
         JSON.stringify({ error: "Maps API key not configured" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -60,32 +54,59 @@ serve(async (req) => {
     );
   }
 
+  // All remaining actions require the proxy token
+  if (!proxyToken) {
+    console.error("VALINOR_PROXY_TOKEN is not set — cannot call external APIs");
+    return new Response(
+      JSON.stringify({
+        error: "External API service unavailable. Please try again later.",
+      }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   // ─── ACTION: send-email ───────────────────────────────────────────
   if (action === "send-email") {
     try {
       const { from, to, subject, html } = params;
+
       if (!to || !subject || !html) {
         return new Response(
           JSON.stringify({ error: "Missing required email fields: to, subject, html" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("Sending email to:", to, "subject:", subject);
+
       const res = await fetch(proxyUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-proxy-token": proxyToken },
+        headers: {
+          "Content-Type": "application/json",
+          "x-proxy-token": proxyToken,
+        },
         body: JSON.stringify({
           provider: "resend",
           endpoint: "/emails",
           payload: {
-            from: from || "Test15 <noreply@test15.app>",
-            to,
+            from: from ?? "Test15 <onboarding@resend.dev>",
+            to: [to],
             subject,
             html,
           },
         }),
       });
-      const data = await res.json();
-      console.log("send-email response status:", res.status);
+
+      const responseText = await res.text();
+      console.log("send-email raw response:", res.status, responseText);
+
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { raw: responseText };
+      }
+
       return new Response(JSON.stringify(data), {
         status: res.ok ? 200 : res.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -115,7 +136,12 @@ serve(async (req) => {
         body: JSON.stringify({
           provider: "openai",
           endpoint: "/v1/chat/completions",
-          payload: { model: model || "gpt-4o-mini", messages, max_tokens: 1024, temperature: 0.7 },
+          payload: {
+            model: model ?? "gpt-4o-mini",
+            messages,
+            max_tokens: 1024,
+            temperature: 0.7,
+          },
         }),
       });
       const data = await res.json();

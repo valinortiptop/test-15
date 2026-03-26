@@ -1,7 +1,7 @@
 // @ts-nocheck
 // src/components/ContactForm.tsx
 import { useState } from "react";
-import { Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Send, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
 
@@ -12,21 +12,14 @@ interface FormData {
   message: string;
 }
 
-const initialFormData: FormData = {
-  name: "",
-  email: "",
-  phone: "",
-  message: "",
-};
+const initialFormData: FormData = { name: "", email: "", phone: "", message: "" };
 
-function ContactForm() {
+export default function ContactForm() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -40,73 +33,106 @@ function ContactForm() {
     }
 
     setLoading(true);
-    let dbSuccess = false;
-    let emailSuccess = false;
 
-    // Step 1: Save to database
+    // ── Step 1: Save to DB ──────────────────────────────────────────
     try {
-      const { error } = await supabase.from("contact_messages").insert({
+      const { error: dbError } = await supabase.from("contact_messages").insert({
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim() || null,
         message: formData.message.trim(),
       });
 
-      if (error) {
-        console.error("DB insert error:", error);
-        toast.error("Failed to save your message. Please try again.");
+      if (dbError) {
+        console.error("DB insert error:", dbError);
+        toast.error(`Could not save your message: ${dbError.message}`);
         setLoading(false);
         return;
       }
-
-      dbSuccess = true;
     } catch (err) {
-      console.error("DB error:", err);
-      toast.error("Something went wrong. Please try again later.");
+      console.error("DB exception:", err);
+      toast.error("Something went wrong saving your message. Please try again.");
       setLoading(false);
       return;
     }
 
-    // Step 2: Send email notification (best effort)
+    // ── Step 2: Send confirmation email via Resend (best-effort) ───
     try {
-      const { error: fnError } = await supabase.functions.invoke("api-handler", {
+      const { data: emailData, error: emailError } = await supabase.functions.invoke(
+        "api-handler",
+        {
+          body: {
+            action: "send-email",
+            from: "Test15 <onboarding@resend.dev>",
+            to: formData.email.trim(),
+            subject: `We received your message, ${formData.name.trim()}!`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9fafb;border-radius:12px;">
+                <div style="background:#2563eb;border-radius:8px;padding:24px;text-align:center;margin-bottom:24px;">
+                  <h1 style="color:#fff;margin:0;font-size:24px;">Test15</h1>
+                </div>
+                <h2 style="color:#111827;font-size:20px;margin-bottom:8px;">
+                  Thanks for reaching out, ${formData.name.trim()}!
+                </h2>
+                <p style="color:#6b7280;line-height:1.6;margin-bottom:16px;">
+                  We've received your message and will get back to you as soon as possible,
+                  usually within one business day.
+                </p>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:24px;">
+                  <p style="color:#374151;font-size:14px;margin:0 0 8px 0;font-weight:600;">Your message:</p>
+                  <p style="color:#6b7280;font-size:14px;margin:0;line-height:1.6;">${formData.message.trim()}</p>
+                </div>
+                <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
+                  — The Test15 Team &nbsp;·&nbsp; Paseo de la Reforma 333, CDMX
+                </p>
+              </div>
+            `,
+          },
+        }
+      );
+
+      if (emailError) {
+        console.warn("Email notification failed (non-critical):", emailError);
+      } else {
+        console.log("Email sent successfully:", emailData);
+      }
+    } catch (err) {
+      console.warn("Email send exception (non-critical):", err);
+    }
+
+    // ── Also notify admin ───────────────────────────────────────────
+    try {
+      await supabase.functions.invoke("api-handler", {
         body: {
           action: "send-email",
-          from: "Test15 <noreply@test15.app>",
-          to: formData.email.trim(),
-          subject: `Thank you for reaching out, ${formData.name.trim()}!`,
+          from: "Test15 Contact Form <onboarding@resend.dev>",
+          to: "hello@test15.app",
+          subject: `New contact message from ${formData.name.trim()}`,
           html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Thank you, ${formData.name.trim()}!</h2>
-              <p>We received your message and will get back to you shortly.</p>
-              <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
-                — The Test15 Team
-              </p>
+            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+              <h2 style="color:#111827;">New Contact Message</h2>
+              <table style="width:100%;border-collapse:collapse;">
+                <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;width:80px;">Name:</td>
+                    <td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${formData.name.trim()}</td></tr>
+                <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Email:</td>
+                    <td style="padding:8px 0;color:#111827;font-size:14px;">${formData.email.trim()}</td></tr>
+                ${formData.phone ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Phone:</td>
+                    <td style="padding:8px 0;color:#111827;font-size:14px;">${formData.phone.trim()}</td></tr>` : ""}
+                <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;vertical-align:top;">Message:</td>
+                    <td style="padding:8px 0;color:#111827;font-size:14px;">${formData.message.trim()}</td></tr>
+              </table>
             </div>
           `,
         },
       });
-
-      if (!fnError) {
-        emailSuccess = true;
-      } else {
-        console.warn("Email send warning:", fnError);
-      }
     } catch (err) {
-      console.warn("Email notification failed (non-critical):", err);
+      console.warn("Admin notification failed (non-critical):", err);
     }
 
     setLoading(false);
-
-    if (dbSuccess) {
-      setSubmitted(true);
-      setFormData(initialFormData);
-      if (emailSuccess) {
-        toast.success("Message sent! Check your inbox for a confirmation.");
-      } else {
-        toast.success("Message saved! We'll get back to you soon.");
-      }
-    }
+    setSubmitted(true);
+    setFormData(initialFormData);
+    toast.success("Message sent! Check your inbox for a confirmation email.");
   };
 
   if (submitted) {
@@ -115,17 +141,12 @@ function ContactForm() {
         <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle2 className="w-8 h-8 text-green-600" />
         </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-3">
-          Message Received!
-        </h3>
+        <h3 className="text-2xl font-bold text-gray-900 mb-3">Message Received!</h3>
         <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          Thank you for reaching out. We&apos;ll review your message and get back
-          to you as soon as possible.
+          Thank you for reaching out. We&apos;ll review your message and get back to you shortly.
+          A confirmation email has been sent to your inbox.
         </p>
-        <button
-          onClick={() => setSubmitted(false)}
-          className="btn-secondary"
-        >
+        <button onClick={() => setSubmitted(false)} className="btn-secondary">
           Send Another Message
         </button>
       </div>
@@ -140,7 +161,6 @@ function ContactForm() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {/* Name */}
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
             Full Name <span className="text-red-500">*</span>
@@ -156,8 +176,6 @@ function ContactForm() {
             className="input-field"
           />
         </div>
-
-        {/* Email */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
             Email Address <span className="text-red-500">*</span>
@@ -175,7 +193,6 @@ function ContactForm() {
         </div>
       </div>
 
-      {/* Phone */}
       <div>
         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
           Phone Number <span className="text-gray-400 font-normal">(optional)</span>
@@ -186,12 +203,11 @@ function ContactForm() {
           name="phone"
           value={formData.phone}
           onChange={handleChange}
-          placeholder="+1 (555) 123-4567"
+          placeholder="+52 (55) 5000-8765"
           className="input-field"
         />
       </div>
 
-      {/* Message */}
       <div>
         <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
           Message <span className="text-red-500">*</span>
@@ -208,7 +224,6 @@ function ContactForm() {
         />
       </div>
 
-      {/* Submit */}
       <button type="submit" disabled={loading} className="btn-primary w-full sm:w-auto">
         {loading ? (
           <>
@@ -225,5 +240,3 @@ function ContactForm() {
     </form>
   );
 }
-
-export default ContactForm;
