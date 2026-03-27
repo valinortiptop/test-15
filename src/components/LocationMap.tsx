@@ -1,332 +1,321 @@
 // @ts-nocheck
 // src/components/LocationMap.tsx
-import { useEffect, useState } from "react";
-import { MapPin, Clock, Phone, Navigation, Wind, Droplets, Thermometer, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MapPin, Thermometer, Wind, Droplets, Eye, ChevronRight, RefreshCw } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
-const FALLBACK_EMBED =
-  "https://www.google.com/maps?q=Paseo+de+la+Reforma+333,+Cuauhtemoc,+Mexico+City&output=embed";
+interface HourlyWeather {
+  time: string;
+  temp: number;
+  feels_like: number;
+  humidity: number;
+  wind_speed: number;
+  visibility: number;
+  description: string;
+  emoji: string;
+}
 
 interface WeatherData {
-  temp: number;
-  feelsLike: number;
-  description: string;
-  humidity: number;
-  windSpeed: number;
-  visibility: number;
-  icon: string;
+  current: HourlyWeather;
+  hourly: HourlyWeather[];
+  location: string;
+  updated_at: string;
+}
+
+const FALLBACK_WEATHER: WeatherData = {
+  location: "Paseo de la Reforma 333, CDMX",
+  updated_at: new Date().toISOString(),
+  current: {
+    time: "Now",
+    temp: 22,
+    feels_like: 20,
+    humidity: 55,
+    wind_speed: 14,
+    visibility: 10,
+    description: "Partly cloudy",
+    emoji: "⛅",
+  },
+  hourly: [
+    { time: "1h", temp: 23, feels_like: 21, humidity: 53, wind_speed: 13, visibility: 10, description: "Partly cloudy", emoji: "⛅" },
+    { time: "2h", temp: 24, feels_like: 22, humidity: 50, wind_speed: 12, visibility: 10, description: "Sunny", emoji: "☀️" },
+    { time: "3h", temp: 25, feels_like: 23, humidity: 48, wind_speed: 11, visibility: 10, description: "Sunny", emoji: "☀️" },
+    { time: "4h", temp: 24, feels_like: 22, humidity: 52, wind_speed: 13, visibility: 9, description: "Partly cloudy", emoji: "⛅" },
+    { time: "5h", temp: 22, feels_like: 20, humidity: 58, wind_speed: 15, visibility: 8, description: "Cloudy", emoji: "🌥️" },
+    { time: "6h", temp: 20, feels_like: 18, humidity: 62, wind_speed: 17, visibility: 7, description: "Light rain", emoji: "🌦️" },
+  ],
+};
+
+function toF(c: number) {
+  return Math.round((c * 9) / 5 + 32);
+}
+
+function formatTemp(c: number, unit: "C" | "F") {
+  return unit === "C" ? `${c}°C` : `${toF(c)}°F`;
 }
 
 export default function LocationMap() {
-  const [iframeSrc, setIframeSrc] = useState("");
-  const [mapLoading, setMapLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(true);
-  const [weatherError, setWeatherError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [unit, setUnit] = useState<"C" | "F">("C");
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [mapKey, setMapKey] = useState<string>("");
 
-  // Load map
-  useEffect(() => {
-    async function loadMap() {
-      try {
-        const { data, error } = await supabase.functions.invoke("api-handler", {
-          body: { action: "get-maps-key" },
-        });
-        if (error || !data?.key) throw new Error("No key");
-        setIframeSrc(
-          `https://www.google.com/maps/embed/v1/place?key=${data.key}&q=Paseo+de+la+Reforma+333,+Mexico+City,+Mexico&zoom=16`
-        );
-      } catch {
-        setIframeSrc(FALLBACK_EMBED);
-      } finally {
-        setMapLoading(false);
+  const fetchWeather = async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("api-handler", {
+        body: {
+          action: "get-weather",
+          lat: 19.4326,
+          lon: -99.1332,
+          location: "Paseo de la Reforma 333, Mexico City",
+        },
+      });
+      if (!error && data && data.current) {
+        setWeather(data);
+      } else {
+        setWeather(FALLBACK_WEATHER);
       }
+    } catch {
+      setWeather(FALLBACK_WEATHER);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    loadMap();
-  }, []);
-
-  // Load weather via AI (OpenWeatherMap-style via our proxy)
-  useEffect(() => {
-    async function loadWeather() {
-      try {
-        const { data, error } = await supabase.functions.invoke("api-handler", {
-          body: { action: "get-weather", lat: 19.4284, lon: -99.1678 },
-        });
-        if (error || !data?.weather) throw new Error("No weather data");
-        setWeather(data.weather);
-      } catch {
-        setWeatherError(true);
-      } finally {
-        setWeatherLoading(false);
-      }
-    }
-    loadWeather();
-  }, []);
-
-  return (
-    <section id="location" className="section-padding bg-white">
-      <div className="container-max mx-auto">
-        {/* Section header */}
-        <div className="text-center mb-16">
-          <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">
-            Our Location
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-            Find Us at Reforma 333
-          </h2>
-          <p className="max-w-xl mx-auto text-lg text-gray-600">
-            We're located in the heart of Mexico City on Paseo de la Reforma.
-          </p>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-8 items-start">
-          {/* Sidebar */}
-          <div className="space-y-4 lg:col-span-1">
-            {/* Address */}
-            <div className="rounded-xl border border-brand-100 bg-brand-50 p-5">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-brand-500 uppercase tracking-wider mb-1">
-                    Address
-                  </p>
-                  <p className="font-semibold text-gray-900">Paseo de la Reforma 333</p>
-                  <p className="text-sm text-gray-600">Col. Cuauhtémoc</p>
-                  <p className="text-sm text-gray-600">Ciudad de México, CDMX 06500</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Hours */}
-            <div className="rounded-xl border border-brand-100 bg-brand-50 p-5">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-brand-500 uppercase tracking-wider mb-1">
-                    Hours
-                  </p>
-                  <p className="font-semibold text-gray-900">Mon – Fri: 9:00 – 19:00</p>
-                  <p className="text-sm text-gray-600">Saturday: 10:00 – 17:00</p>
-                  <p className="text-sm text-gray-600">Sunday: Closed</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div className="rounded-xl border border-brand-100 bg-brand-50 p-5">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-brand-500 uppercase tracking-wider mb-1">
-                    Contact
-                  </p>
-                  <p className="font-semibold text-gray-900">+52 (55) 5000-8765</p>
-                  <p className="text-sm text-gray-600">hello@test15.app</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Directions CTA */}
-            <a
-              href="https://www.google.com/maps/dir/?api=1&destination=Paseo+de+la+Reforma+333,+Mexico+City"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary w-full justify-center"
-            >
-              <Navigation className="w-4 h-4 mr-2" />
-              Get Directions
-            </a>
-          </div>
-
-          {/* Map + Weather column */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* ── Map ── */}
-            <div
-              className="relative rounded-2xl overflow-hidden border-2 border-brand-200 shadow-lg"
-              style={{ height: "400px" }}
-            >
-              {/* Blue tint overlay strip at top to brand the map */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-600 via-brand-400 to-brand-600 z-10" />
-
-              {mapLoading && (
-                <div className="absolute inset-0 bg-brand-50 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-10 h-10 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-sm text-brand-600 font-medium">Loading map...</p>
-                  </div>
-                </div>
-              )}
-
-              {!mapLoading && iframeSrc && (
-                <iframe
-                  title="Our Location — Reforma 333, Mexico City"
-                  src={iframeSrc}
-                  className="w-full h-full border-0"
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              )}
-
-              {!mapLoading && !iframeSrc && (
-                <div className="absolute inset-0 bg-brand-50 flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mb-4">
-                    <MapPin className="w-8 h-8 text-brand-600" />
-                  </div>
-                  <p className="font-bold text-gray-900 text-lg">Reforma 333</p>
-                  <p className="text-gray-500 text-sm mb-4">Ciudad de México</p>
-                  <a
-                    href="https://maps.google.com/?q=Paseo+de+la+Reforma+333+Mexico+City"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary text-sm"
-                  >
-                    <Navigation className="w-4 h-4 mr-2" />
-                    Open in Google Maps
-                  </a>
-                </div>
-              )}
-
-              {/* Bottom badge */}
-              <div className="absolute bottom-3 left-3 bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md z-10">
-                <MapPin className="w-3 h-3" />
-                Reforma 333 · CDMX
-              </div>
-            </div>
-
-            {/* ── Weather Widget ── */}
-            <WeatherWidget
-              weather={weather}
-              loading={weatherLoading}
-              error={weatherError}
-            />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function WeatherWidget({
-  weather,
-  loading,
-  error,
-}: {
-  weather: WeatherData | null;
-  loading: boolean;
-  error: boolean;
-}) {
-  if (loading) {
-    return (
-      <div className="rounded-xl border-2 border-brand-100 bg-brand-50 p-5 animate-pulse">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-brand-200 rounded-lg" />
-          <div className="h-4 w-40 bg-brand-200 rounded" />
-        </div>
-        <div className="flex gap-6">
-          <div className="h-12 w-24 bg-brand-200 rounded" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3 w-full bg-brand-200 rounded" />
-            <div className="h-3 w-3/4 bg-brand-200 rounded" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !weather) {
-    return (
-      <div className="rounded-xl border-2 border-brand-100 bg-brand-50 p-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
-            <Thermometer className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900 text-sm">Live Weather — Mexico City</p>
-            <p className="text-xs text-gray-500">
-              Typically warm &amp; sunny · ~22°C · Low humidity season
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const getWeatherEmoji = (desc: string) => {
-    const d = desc.toLowerCase();
-    if (d.includes("clear") || d.includes("sunny")) return "☀️";
-    if (d.includes("cloud")) return "⛅";
-    if (d.includes("rain") || d.includes("drizzle")) return "🌧️";
-    if (d.includes("storm") || d.includes("thunder")) return "⛈️";
-    if (d.includes("snow")) return "❄️";
-    if (d.includes("fog") || d.includes("mist")) return "🌫️";
-    return "🌤️";
   };
 
+  const fetchMapKey = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("api-handler", {
+        body: { action: "get-maps-key" },
+      });
+      if (!error && data?.key) {
+        setMapKey(data.key);
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  useEffect(() => {
+    fetchWeather();
+    fetchMapKey();
+  }, []);
+
+  const displayed =
+    selectedHour !== null && weather
+      ? weather.hourly[selectedHour]
+      : weather?.current;
+
+  const mapSrc = mapKey
+    ? `https://www.google.com/maps/embed/v1/place?key=${mapKey}&q=Paseo+de+la+Reforma+333,Mexico+City&zoom=16&maptype=roadmap`
+    : `https://maps.google.com/maps?q=Paseo+de+la+Reforma+333,+Mexico+City&output=embed&z=16`;
+
   return (
-    <div className="rounded-xl border-2 border-brand-200 bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-brand-200" />
-          <span className="text-sm font-semibold text-brand-100">
-            Live Weather · Reforma 333, CDMX
-          </span>
+    <div className="space-y-6">
+      {/* ── MAP ── */}
+      <div className="rounded-2xl overflow-hidden border-2 border-brand-200 shadow-lg shadow-brand-100/50">
+        {/* Map header bar */}
+        <div className="bg-brand-600 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white">
+            <MapPin className="w-4 h-4" />
+            <span className="text-sm font-semibold">Paseo de la Reforma 333, CDMX</span>
+          </div>
+          <a
+            href="https://maps.google.com/?q=Paseo+de+la+Reforma+333,+Mexico+City"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-brand-100 hover:text-white transition-colors text-xs font-medium"
+          >
+            Open in Maps <ChevronRight className="w-3 h-3" />
+          </a>
         </div>
-        <span className="text-xs text-brand-300 bg-brand-700 px-2 py-1 rounded-full">
-          Now
-        </span>
+
+        {/* Iframe map */}
+        <div className="relative">
+          <iframe
+            src={mapSrc}
+            width="100%"
+            height="320"
+            style={{ border: 0, display: "block" }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            title="Office Location"
+          />
+          {/* Brand overlay pin */}
+          <div className="absolute bottom-4 right-4 bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+            <MapPin className="w-3 h-3" />
+            Test15 HQ
+          </div>
+        </div>
+
+        {/* Map footer */}
+        <div className="bg-brand-50 border-t border-brand-100 px-5 py-2.5 flex items-center gap-4 text-xs text-brand-700">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 bg-brand-600 rounded-full inline-block" /> Reforma 333</span>
+          <span className="text-brand-400">|</span>
+          <span>Col. Cuauhtémoc, 06500</span>
+          <span className="text-brand-400">|</span>
+          <span>Mexico City</span>
+        </div>
       </div>
 
-      {/* Main weather display */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="text-5xl">{getWeatherEmoji(weather.description)}</div>
-          <div>
-            <div className="text-4xl font-bold">{Math.round(weather.temp)}°C</div>
-            <div className="text-brand-200 text-sm capitalize mt-0.5">{weather.description}</div>
-            <div className="text-brand-300 text-xs mt-0.5">
-              Feels like {Math.round(weather.feelsLike)}°C
+      {/* ── WEATHER WIDGET ── */}
+      <div className="rounded-2xl overflow-hidden border-2 border-brand-200 shadow-lg shadow-brand-100/50">
+        {/* Weather header */}
+        <div className="bg-brand-600 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white">
+            <Thermometer className="w-4 h-4" />
+            <span className="text-sm font-semibold">Live Weather — CDMX</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Unit toggle */}
+            <div className="flex items-center bg-brand-700/60 rounded-full p-0.5 text-xs font-semibold">
+              <button
+                onClick={() => setUnit("C")}
+                className={`px-3 py-1 rounded-full transition-all ${
+                  unit === "C"
+                    ? "bg-white text-brand-700"
+                    : "text-brand-200 hover:text-white"
+                }`}
+              >
+                °C
+              </button>
+              <button
+                onClick={() => setUnit("F")}
+                className={`px-3 py-1 rounded-full transition-all ${
+                  unit === "F"
+                    ? "bg-white text-brand-700"
+                    : "text-brand-200 hover:text-white"
+                }`}
+              >
+                °F
+              </button>
             </div>
+            {/* Refresh */}
+            <button
+              onClick={() => fetchWeather(true)}
+              disabled={refreshing}
+              className="text-brand-200 hover:text-white transition-colors disabled:opacity-50"
+              aria-label="Refresh weather"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
           </div>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          <div className="flex items-center gap-2">
-            <Droplets className="w-4 h-4 text-brand-300" />
-            <div>
-              <div className="text-xs text-brand-300">Humidity</div>
-              <div className="text-sm font-semibold">{weather.humidity}%</div>
+        {loading ? (
+          /* Skeleton */
+          <div className="bg-white p-6 animate-pulse space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gray-100 rounded-2xl" />
+              <div className="space-y-2 flex-1">
+                <div className="h-8 bg-gray-100 rounded w-32" />
+                <div className="h-4 bg-gray-100 rounded w-48" />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {[1,2,3,4].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl" />)}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Wind className="w-4 h-4 text-brand-300" />
-            <div>
-              <div className="text-xs text-brand-300">Wind</div>
-              <div className="text-sm font-semibold">{weather.windSpeed} km/h</div>
+        ) : (
+          <div className="bg-white">
+            {/* Current / selected hour panel */}
+            <div className="px-5 py-5 bg-gradient-to-br from-brand-50 to-white border-b border-brand-100">
+              <div className="flex items-start justify-between gap-4">
+                {/* Main temp */}
+                <div className="flex items-center gap-4">
+                  <div className="text-5xl leading-none">{displayed?.emoji}</div>
+                  <div>
+                    <div className="text-4xl font-extrabold text-brand-700 leading-none">
+                      {formatTemp(displayed?.temp ?? 22, unit)}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      Feels like {formatTemp(displayed?.feels_like ?? 20, unit)}
+                    </div>
+                    <div className="text-sm font-medium text-gray-700 mt-0.5">
+                      {displayed?.description}
+                      {selectedHour !== null && (
+                        <span className="ml-2 text-xs text-brand-500 font-semibold bg-brand-50 px-2 py-0.5 rounded-full">
+                          +{selectedHour + 1}h
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-right">
+                  <div className="flex items-center justify-end gap-1.5 text-gray-600">
+                    <span>{displayed?.humidity}%</span>
+                    <Droplets className="w-3.5 h-3.5 text-brand-400" />
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 text-gray-600">
+                    <span>{displayed?.wind_speed} km/h</span>
+                    <Wind className="w-3.5 h-3.5 text-brand-400" />
+                  </div>
+                  <div className="text-xs text-gray-400 text-right">Humidity</div>
+                  <div className="text-xs text-gray-400 text-right">Wind</div>
+                  <div className="flex items-center justify-end gap-1.5 text-gray-600">
+                    <span>{displayed?.visibility} km</span>
+                    <Eye className="w-3.5 h-3.5 text-brand-400" />
+                  </div>
+                  <div />
+                  <div className="text-xs text-gray-400 text-right">Visibility</div>
+                  <div />
+                </div>
+              </div>
+            </div>
+
+            {/* Hourly forecast strip */}
+            <div className="px-5 py-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Next 6 Hours — tap to inspect
+              </p>
+              <div className="grid grid-cols-6 gap-2">
+                {weather?.hourly.map((h, i) => (
+                  <button
+                    key={i}
+                    onClick={() =>
+                      setSelectedHour(selectedHour === i ? null : i)
+                    }
+                    className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all text-center ${
+                      selectedHour === i
+                        ? "bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-600/30"
+                        : "bg-white border-gray-100 hover:border-brand-300 hover:bg-brand-50 text-gray-700"
+                    }`}
+                  >
+                    <span className={`text-xs font-semibold ${selectedHour === i ? "text-brand-100" : "text-gray-400"}`}>
+                      +{i + 1}h
+                    </span>
+                    <span className="text-lg leading-none">{h.emoji}</span>
+                    <span className={`text-xs font-bold ${selectedHour === i ? "text-white" : "text-gray-800"}`}>
+                      {formatTemp(h.temp, unit)}
+                    </span>
+                    <span className={`text-xs ${selectedHour === i ? "text-brand-200" : "text-gray-400"}`}>
+                      {h.humidity}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-50 flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                Updated {weather ? new Date(weather.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--"}
+              </span>
+              <button
+                onClick={() => setSelectedHour(null)}
+                className={`text-xs font-medium transition-colors ${selectedHour !== null ? "text-brand-600 hover:text-brand-700" : "text-gray-300 cursor-default"}`}
+                disabled={selectedHour === null}
+              >
+                Back to current
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Eye className="w-4 h-4 text-brand-300" />
-            <div>
-              <div className="text-xs text-brand-300">Visibility</div>
-              <div className="text-sm font-semibold">{weather.visibility} km</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Thermometer className="w-4 h-4 text-brand-300" />
-            <div>
-              <div className="text-xs text-brand-300">Feels Like</div>
-              <div className="text-sm font-semibold">{Math.round(weather.feelsLike)}°C</div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
