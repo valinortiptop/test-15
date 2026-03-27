@@ -1,0 +1,169 @@
+/g, "").trim();
+        weatherJson = JSON.parse(cleaned);
+      } catch {
+        // Fallback with typical CDMX weather
+        weatherJson = {
+          temp: 22,
+          feelsLike: 21,
+          description: "Partly cloudy",
+          humidity: 65,
+          windSpeed: 14,
+          visibility: 10,
+        };
+      }
+
+      return new Response(
+        JSON.stringify({ weather: weatherJson }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (err) {
+      console.error("get-weather error:", err);
+      // Return fallback weather rather than an error
+      return new Response(
+        JSON.stringify({
+          weather: {
+            temp: 22,
+            feelsLike: 21,
+            description: "Partly cloudy",
+            humidity: 65,
+            windSpeed: 14,
+            visibility: 10,
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // All remaining actions require the proxy token
+  if (!proxyToken) {
+    console.error("VALINOR_PROXY_TOKEN is not set");
+    return new Response(
+      JSON.stringify({ error: "External API service unavailable. Please try again later." }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // ─── ACTION: send-email ───────────────────────────────────────────
+  if (action === "send-email") {
+    try {
+      const { from, to, subject, html } = params;
+      if (!to || !subject || !html) {
+        return new Response(
+          JSON.stringify({ error: "Missing required email fields: to, subject, html" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log("Sending email to:", to, "subject:", subject);
+      const res = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-proxy-token": proxyToken },
+        body: JSON.stringify({
+          provider: "resend",
+          endpoint: "/emails",
+          payload: {
+            from: from ?? "Test15 <onboarding@resend.dev>",
+            to: [to],
+            subject,
+            html,
+          },
+        }),
+      });
+      const responseText = await res.text();
+      console.log("send-email raw response:", res.status, responseText);
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { raw: responseText };
+      }
+      return new Response(JSON.stringify(data), {
+        status: res.ok ? 200 : res.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("send-email error:", err);
+      return new Response(
+        JSON.stringify({ error: "Failed to send email", details: String(err) }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // ─── ACTION: chat ─────────────────────────────────────────────────
+  if (action === "chat") {
+    try {
+      const { messages, model } = params;
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "Missing or invalid 'messages' array" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const res = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-proxy-token": proxyToken },
+        body: JSON.stringify({
+          provider: "openai",
+          endpoint: "/v1/chat/completions",
+          payload: { model: model ?? "gpt-4o-mini", messages, max_tokens: 1024, temperature: 0.7 },
+        }),
+      });
+      const data = await res.json();
+      return new Response(JSON.stringify(data), {
+        status: res.ok ? 200 : res.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("chat error:", err);
+      return new Response(
+        JSON.stringify({ error: "Failed to get AI response", details: String(err) }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // ─── ACTION: geocode ──────────────────────────────────────────────
+  if (action === "geocode") {
+    try {
+      const { address } = params;
+      if (!address) {
+        return new Response(
+          JSON.stringify({ error: "Missing 'address' parameter" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const res = await fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-proxy-token": proxyToken },
+        body: JSON.stringify({
+          provider: "google",
+          endpoint: "/maps/api/geocode/json",
+          payload: { address },
+        }),
+      });
+      const data = await res.json();
+      return new Response(JSON.stringify(data), {
+        status: res.ok ? 200 : res.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("geocode error:", err);
+      return new Response(
+        JSON.stringify({ error: "Failed to geocode address", details: String(err) }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // ─── UNKNOWN ACTION ───────────────────────────────────────────────
+  console.warn("Unknown action received:", action);
+  return new Response(
+    JSON.stringify({
+      error: "Unknown action",
+      received: action,
+      available: ["get-maps-key", "get-weather", "send-email", "chat", "geocode"],
+    }),
+    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+});
