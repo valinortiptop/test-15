@@ -1,9 +1,8 @@
 // @ts-nocheck
 // src/components/ImageGenerator.tsx
-import { useState, useEffect } from "react";
-import { Sparkles, Loader2, Image as ImageIcon } from "lucide-react";
+import { useState } from "react";
+import { Sparkles, Loader2, ImageIcon, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { toast } from "sonner";
 
 interface GeneratedImage {
   id: string;
@@ -12,126 +11,161 @@ interface GeneratedImage {
   created_at: string;
 }
 
+function extractBase64(data: any): string {
+  try {
+    const parts = data?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return "";
+    for (const part of parts) {
+      if (part?.inlineData?.data) return part.inlineData.data as string;
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState("");
-  const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [images, setImages] = useState<GeneratedImage[]>([]);
-  const [loadingGallery, setLoadingGallery] = useState(true);
 
-  const fetchImages = async () => {
+  const handleGenerate = async () => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError("");
+
     try {
-      const { data, error } = await supabase
+      const { data, error: fnError } = await supabase.functions.invoke("api-handler", {
+        body: {
+          action: "generate-image",
+          prompt: trimmed,
+        },
+      });
+
+      if (fnError) throw new Error(fnError.message);
+
+      const resData = data as any;
+      const base64 = extractBase64(resData);
+
+      if (!base64) {
+        throw new Error("No image data returned from API.");
+      }
+
+      const { data: dbRow, error: dbError } = await supabase
         .from("generated_images")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(12);
-      if (!error && data) setImages(data);
-    } catch (e) {
-      console.warn("Gallery fetch failed", e);
+        .insert({ prompt: trimmed, image_base64: base64 })
+        .select()
+        .single();
+
+      if (dbError) {
+        console.warn("DB insert failed, showing image without saving:", dbError);
+        const tempImage: GeneratedImage = {
+          id: Date.now().toString(),
+          prompt: trimmed,
+          image_base64: base64,
+          created_at: new Date().toISOString(),
+        };
+        setImages((prev) => [tempImage, ...prev]);
+      } else {
+        setImages((prev) => [dbRow as GeneratedImage, ...prev]);
+      }
+
+      setPrompt("");
+    } catch (err: any) {
+      console.error("Image generation error:", err);
+      setError(err.message || "Failed to generate image. Please try again.");
     } finally {
-      setLoadingGallery(false);
+      setLoading(false);
     }
   };
 
-  useEffect(() => { fetchImages(); }, []);
-
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim()) return;
-    setGenerating(true);
-    const tid = toast.loading("Generating with Gemini AI...");
-    try {
-      const { data, error } = await supabase.functions.invoke("api-handler", {
-        body: { action: "generate-image", prompt: prompt.trim() },
-      });
-
-      if (error) throw new Error(error.message);
-
-      const raw = data as any;
-      if (raw?.error) throw new Error(raw.error);
-
-      const parts: any[] = raw?.candidates?.[0]?.content?.parts ?? [];
-      const imgPart = parts.find((p: any) => p?.inlineData?.data);
-      if (!imgPart) {
-        const reason = raw?.promptFeedback?.blockReason;
-        throw new Error(reason ? `Blocked: ${reason}` : "No image returned by AI");
-      }
-
-      const { error: dbErr } = await supabase.from("generated_images").insert({
-        prompt: prompt.trim(),
-        image_base64: imgPart.inlineData.data,
-      });
-      if (dbErr) throw dbErr;
-
-      toast.success("Image created and saved to gallery!", { id: tid });
-      setPrompt("");
-      fetchImages();
-    } catch (err: any) {
-      toast.error(err?.message ?? "Generation failed. Try again.", { id: tid });
-    } finally {
-      setGenerating(false);
-    }
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !loading) handleGenerate();
   };
 
   return (
-    <div className="card p-6 sm:p-10 bg-white">
-      <div className="text-center max-w-2xl mx-auto mb-8">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-brand-50 rounded-xl mb-4">
-          <Sparkles className="w-6 h-6 text-brand-600" />
+    <div className="card p-6 sm:p-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center">
+          <Sparkles className="w-5 h-5 text-brand-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Community AI Gallery</h2>
-        <p className="text-gray-500">
-          Powered by Gemini 3.1 Flash Image Preview. Type a prompt, generate an image, and share it with everyone.
-        </p>
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">AI Image Generator</h3>
+          <p className="text-sm text-gray-500">Describe an image and watch it come to life</p>
+        </div>
       </div>
 
-      <form onSubmit={handleGenerate} className="flex flex-col sm:flex-row gap-3 max-w-3xl mx-auto mb-10">
+      <div className="flex gap-3 mb-6">
         <input
           type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="A futuristic city in Mexico at sunset, cyberpunk style..."
+          onKeyDown={handleKeyDown}
+          placeholder="A futuristic city at sunset..."
+          disabled={loading}
           className="input-field flex-1"
-          disabled={generating}
-          required
         />
-        <button type="submit" disabled={generating || !prompt.trim()} className="btn-primary whitespace-nowrap">
-          {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Sparkles className="w-4 h-4 mr-2" />Generate</>}
+        <button
+          onClick={handleGenerate}
+          disabled={loading || !prompt.trim()}
+          className="btn-primary flex-shrink-0"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Sparkles className="w-4 h-4" />
+          )}
+          <span className="ml-2 hidden sm:inline">
+            {loading ? "Generating..." : "Generate"}
+          </span>
         </button>
-      </form>
+      </div>
 
-      <div>
-        <h3 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-gray-400" /> Recent Creations
-        </h3>
+      {error && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl mb-6">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
 
-        {loadingGallery ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <div key={i} className="aspect-square bg-gray-100 rounded-xl animate-pulse" />)}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center">
+            <Sparkles className="w-8 h-8 text-brand-400 animate-pulse" />
           </div>
-        ) : images.length === 0 ? (
-          <div className="text-center py-14 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-            <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm">No images yet — be the first to generate one!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {images.map(img => (
-              <div key={img.id} className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                <img
-                  src={`data:image/jpeg;base64,${img.image_base64}`}
-                  alt={img.prompt}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
-                  <p className="text-white text-xs line-clamp-3">"{img.prompt}"</p>
+          <p className="text-sm text-gray-500 font-medium">Creating your image...</p>
+          <p className="text-xs text-gray-400">This may take 10-20 seconds</p>
+        </div>
+      )}
+
+      {!loading && images.length === 0 && !error && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 border-2 border-dashed border-gray-200 rounded-xl">
+          <ImageIcon className="w-10 h-10 text-gray-300" />
+          <p className="text-sm text-gray-400 font-medium">Your generated images will appear here</p>
+          <p className="text-xs text-gray-300">Try: "A serene mountain lake at dawn"</p>
+        </div>
+      )}
+
+      {!loading && images.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {images.map((img) => (
+            <div key={img.id} className="group relative rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+              <img
+                src={"data:image/png;base64," + img.image_base64}
+                alt={img.prompt}
+                className="w-full aspect-square object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute bottom-0 left-0 right-0 p-3">
+                  <p className="text-white text-xs font-medium line-clamp-2">{img.prompt}</p>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

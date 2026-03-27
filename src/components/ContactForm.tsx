@@ -12,10 +12,22 @@ interface FormData {
   message: string;
 }
 
-const initialFormData: FormData = { name: "", email: "", phone: "", message: "" };
+const EMPTY: FormData = { name: "", email: "", phone: "", message: "" };
+
+function buildEmailHtml(name: string): string {
+  return (
+    "<div style=\"font-family:sans-serif;max-width:600px;margin:0 auto\">" +
+    "<h2 style=\"color:#2563eb\">Thank you, " + name + "!</h2>" +
+    "<p>We received your message and will get back to you shortly.</p>" +
+    "<hr style=\"border:none;border-top:1px solid #e5e7eb;margin:24px 0\">" +
+    "<p style=\"color:#9ca3af;font-size:12px\">The Test15 Team</p>" +
+    "<p style=\"color:#9ca3af;font-size:11px\">You received this because you submitted our contact form.</p>" +
+    "</div>"
+  );
+}
 
 export default function ContactForm() {
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [formData, setFormData] = useState<FormData>(EMPTY);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -26,15 +38,12 @@ export default function ContactForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
       toast.error("Please fill in all required fields.");
       return;
     }
-
     setLoading(true);
 
-    // ── Step 1: Save to DB ──────────────────────────────────────────
     try {
       const { error: dbError } = await supabase.from("contact_messages").insert({
         name: formData.name.trim(),
@@ -44,95 +53,34 @@ export default function ContactForm() {
       });
 
       if (dbError) {
-        console.error("DB insert error:", dbError);
-        toast.error(`Could not save your message: ${dbError.message}`);
+        toast.error("Failed to save your message. Please try again.");
         setLoading(false);
         return;
       }
     } catch (err) {
-      console.error("DB exception:", err);
-      toast.error("Something went wrong saving your message. Please try again.");
+      toast.error("Something went wrong. Please try again later.");
       setLoading(false);
       return;
     }
 
-    // ── Step 2: Send confirmation email via Resend (best-effort) ───
-    try {
-      const { data: emailData, error: emailError } = await supabase.functions.invoke(
-        "api-handler",
-        {
-          body: {
-            action: "send-email",
-            from: "Test15 <onboarding@resend.dev>",
-            to: formData.email.trim(),
-            subject: `We received your message, ${formData.name.trim()}!`,
-            html: `
-              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9fafb;border-radius:12px;">
-                <div style="background:#2563eb;border-radius:8px;padding:24px;text-align:center;margin-bottom:24px;">
-                  <h1 style="color:#fff;margin:0;font-size:24px;">Test15</h1>
-                </div>
-                <h2 style="color:#111827;font-size:20px;margin-bottom:8px;">
-                  Thanks for reaching out, ${formData.name.trim()}!
-                </h2>
-                <p style="color:#6b7280;line-height:1.6;margin-bottom:16px;">
-                  We've received your message and will get back to you as soon as possible,
-                  usually within one business day.
-                </p>
-                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:24px;">
-                  <p style="color:#374151;font-size:14px;margin:0 0 8px 0;font-weight:600;">Your message:</p>
-                  <p style="color:#6b7280;font-size:14px;margin:0;line-height:1.6;">${formData.message.trim()}</p>
-                </div>
-                <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
-                  — The Test15 Team &nbsp;·&nbsp; Paseo de la Reforma 333, CDMX
-                </p>
-              </div>
-            `,
-          },
-        }
-      );
-
-      if (emailError) {
-        console.warn("Email notification failed (non-critical):", emailError);
-      } else {
-        console.log("Email sent successfully:", emailData);
-      }
-    } catch (err) {
-      console.warn("Email send exception (non-critical):", err);
-    }
-
-    // ── Also notify admin ───────────────────────────────────────────
     try {
       await supabase.functions.invoke("api-handler", {
         body: {
           action: "send-email",
-          from: "Test15 Contact Form <onboarding@resend.dev>",
-          to: "hello@test15.app",
-          subject: `New contact message from ${formData.name.trim()}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-              <h2 style="color:#111827;">New Contact Message</h2>
-              <table style="width:100%;border-collapse:collapse;">
-                <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;width:80px;">Name:</td>
-                    <td style="padding:8px 0;color:#111827;font-size:14px;font-weight:600;">${formData.name.trim()}</td></tr>
-                <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Email:</td>
-                    <td style="padding:8px 0;color:#111827;font-size:14px;">${formData.email.trim()}</td></tr>
-                ${formData.phone ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Phone:</td>
-                    <td style="padding:8px 0;color:#111827;font-size:14px;">${formData.phone.trim()}</td></tr>` : ""}
-                <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;vertical-align:top;">Message:</td>
-                    <td style="padding:8px 0;color:#111827;font-size:14px;">${formData.message.trim()}</td></tr>
-              </table>
-            </div>
-          `,
+          from: "Test15 <noreply@test15.app>",
+          to: formData.email.trim(),
+          subject: "Thank you for reaching out, " + formData.name.trim() + "!",
+          html: buildEmailHtml(formData.name.trim()),
         },
       });
     } catch (err) {
-      console.warn("Admin notification failed (non-critical):", err);
+      console.warn("Email notification failed (non-critical):", err);
     }
 
     setLoading(false);
     setSubmitted(true);
-    setFormData(initialFormData);
-    toast.success("Message sent! Check your inbox for a confirmation email.");
+    setFormData(EMPTY);
+    toast.success("Message sent! We will get back to you soon.");
   };
 
   if (submitted) {
@@ -143,8 +91,7 @@ export default function ContactForm() {
         </div>
         <h3 className="text-2xl font-bold text-gray-900 mb-3">Message Received!</h3>
         <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          Thank you for reaching out. We&apos;ll review your message and get back to you shortly.
-          A confirmation email has been sent to your inbox.
+          Thank you for reaching out. We will review your message and get back to you as soon as possible.
         </p>
         <button onClick={() => setSubmitted(false)} className="btn-secondary">
           Send Another Message
@@ -157,7 +104,7 @@ export default function ContactForm() {
     <form onSubmit={handleSubmit} className="card p-8 sm:p-12 space-y-6">
       <div>
         <h3 className="text-2xl font-bold text-gray-900 mb-1">Send us a Message</h3>
-        <p className="text-gray-500">Fill out the form below and we&apos;ll get back to you.</p>
+        <p className="text-gray-500">Fill out the form below and we will get back to you.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -203,7 +150,7 @@ export default function ContactForm() {
           name="phone"
           value={formData.phone}
           onChange={handleChange}
-          placeholder="+52 (55) 5000-8765"
+          placeholder="+1 (555) 123-4567"
           className="input-field"
         />
       </div>
