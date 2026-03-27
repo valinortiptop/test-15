@@ -58,7 +58,11 @@ export default function ImageGenerator() {
       const parts = data?.candidates?.[0]?.content?.parts || [];
       const imagePart = parts.find((p: any) => p.inlineData);
 
-      if (!imagePart || !imagePart.inlineData.data) {
+      if (!imagePart || !imagePart.inlineData?.data) {
+         // Check if it was blocked by safety settings
+         if (data?.promptFeedback?.blockReason) {
+            throw new Error(`Blocked by safety filters: ${data.promptFeedback.blockReason}`);
+         }
         throw new Error("No image data received from AI model");
       }
 
