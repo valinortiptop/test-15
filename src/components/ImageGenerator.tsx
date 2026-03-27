@@ -54,19 +54,26 @@ export default function ImageGenerator() {
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
 
-      // Extract base64 from Gemini response
-      const parts = data?.candidates?.[0]?.content?.parts || [];
-      const imagePart = parts.find((p: any) => p.inlineData);
+      // Robust extraction of base64 from Gemini response
+      let base64Data = null;
+      try {
+          const parts = data?.candidates?.[0]?.content?.parts || [];
+          for (const p of parts) {
+             if (p.inlineData && p.inlineData.data) {
+                 base64Data = p.inlineData.data;
+                 break;
+             }
+          }
+      } catch(e) {
+          console.error("Failed parsing parts", e)
+      }
 
-      if (!imagePart || !imagePart.inlineData?.data) {
-         // Check if it was blocked by safety settings
+      if (!base64Data) {
          if (data?.promptFeedback?.blockReason) {
             throw new Error(`Blocked by safety filters: ${data.promptFeedback.blockReason}`);
          }
         throw new Error("No image data received from AI model");
       }
-
-      const base64Data = imagePart.inlineData.data;
 
       // Save to database
       const { error: dbError } = await supabase.from("generated_images").insert({

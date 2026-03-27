@@ -3,6 +3,7 @@
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import ContactForm from "../components/ContactForm";
 import LocationMap from "../components/LocationMap";
+import WeatherWidget from "../components/WeatherWidget";
 import ImageGenerator from "../components/ImageGenerator";
 
 const contactInfo = [
@@ -76,8 +77,11 @@ function Contact() {
               );
             })}
 
-            {/* Interactive Map and Live Weather Widget */}
+            {/* Interactive Map */}
             <LocationMap />
+            
+            {/* Live Weather Widget */}
+            <WeatherWidget />
           </div>
         </div>
 

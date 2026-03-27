@@ -1,92 +1,45 @@
 // @ts-nocheck
 // src/components/LocationMap.tsx
-import { useState, useEffect } from "react";
-import { MapPin, Thermometer, Wind, Droplets, Eye, ChevronRight, RefreshCw } from "lucide-react";
-import { supabase } from "../lib/supabase";
-
-interface HourlyWeather {
-  time: string;
-  temp: number;
-  feels_like: number;
-  humidity: number;
-  wind_speed: number;
-  visibility: number;
-  description: string;
-  emoji: string;
-}
-
-interface WeatherData {
-  current: HourlyWeather;
-  hourly: HourlyWeather[];
-  location: string;
-  updated_at: string;
-}
-
-const FALLBACK_WEATHER: WeatherData = {
-  location: "Paseo de la Reforma 333, CDMX",
-  updated_at: new Date().toISOString(),
-  current: {
-    time: "Now",
-    temp: 22,
-    feels_like: 20,
-    humidity: 55,
-    wind_speed: 14,
-    visibility: 10,
-    description: "Partly cloudy",
-    emoji: "⛅",
-  },
-  hourly: [
-    { time: "+1h", temp: 23, feels_like: 21, humidity: 53, wind_speed: 13, visibility: 10, description: "Partly cloudy", emoji: "⛅" },
-    { time: "+2h", temp: 24, feels_like: 22, humidity: 50, wind_speed: 12, visibility: 10, description: "Sunny", emoji: "☀️" },
-    { time: "+3h", temp: 25, feels_like: 23, humidity: 48, wind_speed: 11, visibility: 10, description: "Sunny", emoji: "☀️" },
-    { time: "+4h", temp: 24, feels_like: 22, humidity: 52, wind_speed: 13, visibility: 9, description: "Partly cloudy", emoji: "⛅" },
-    { time: "+5h", temp: 22, feels_like: 20, humidity: 58, wind_speed: 15, visibility: 8, description: "Cloudy", emoji: "🌥️" },
-    { time: "+6h", temp: 20, feels_like: 18, humidity: 62, wind_speed: 17, visibility: 7, description: "Light rain", emoji: "🌦️" },
-  ],
-};
-
-function toF(c: number) {
-  return Math.round((c * 9) / 5 + 32);
-}
-
-function formatTemp(c: number, unit: "C" | "F") {
-  return unit === "C" ? `${c}°C` : `${toF(c)}°F`;
-}
+import { MapPin, ChevronRight } from "lucide-react";
 
 export default function LocationMap() {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [unit, setUnit] = useState<"C" | "F">("C");
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [mapKey, setMapKey] = useState<string>("");
+  const mapSrc = `https://maps.google.com/maps?q=Paseo+de+la+Reforma+333,+Mexico+City&t=m&z=15&output=embed&iwloc=near`;
 
-  const fetchWeather = async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("api-handler", {
-        body: {
-          action: "chat",
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `You are a weather API. Return ONLY valid JSON representing current and hourly weather for Mexico City. Do NOT wrap in markdown \`\`\`json blocks.
-Format exactly like this:
-{
-  "location": "Paseo de la Reforma 333, CDMX",
-  "updated_at": "${new Date().toISOString()}",
-  "current": { "time": "Now", "temp": 22, "feels_like": 20, "humidity": 55, "wind_speed": 14, "visibility": 10, "description": "Partly cloudy", "emoji": "⛅" },
-  "hourly": [
-    { "time": "+1h", "temp": 23, "feels_like": 21, "humidity": 53, "wind_speed": 13, "visibility": 10, "description": "Partly cloudy", "emoji": "⛅" }
-    // EXACTLY 6 hourly items total
-  ]
-}`
-            }
-          ]
-        },
-      });
+  return (
+    <div className="rounded-2xl overflow-hidden border-2 border-brand-200 shadow-lg shadow-brand-100/50">
+      <div className="bg-brand-600 px-5 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-white">
+          <MapPin className="w-4 h-4" />
+          <span className="text-sm font-semibold">Paseo de la Reforma 333, CDMX</span>
+        </div>
+        <a
+          href="https://maps.google.com/?q=Paseo+de+la+Reforma+333,+Mexico+City"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-brand-100 hover:text-white transition-colors text-xs font-medium"
+        >
+          Open in Maps <ChevronRight className="w-3 h-3" />
+        </a>
+      </div>
 
-      if (!error && data?.choices?.[0]?.message?.content) {
-        const content = data.choices[0].message.content;
-        const jsonStr = content.replace(/
+      <div className="relative bg-gray-100">
+        <iframe
+          src={mapSrc}
+          width="100%"
+          height="320"
+          style={{ border: 0, display: "block" }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          title="Office Location"
+        />
+      </div>
+
+      <div className="bg-brand-50 border-t border-brand-100 px-5 py-2.5 flex items-center gap-4 text-xs text-brand-700">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 bg-brand-600 rounded-full inline-block" /> Reforma 333</span>
+        <span className="text-brand-400">|</span>
+        <span>Col. Cuauhtémoc, 06500</span>
+      </div>
+    </div>
+  );
+}
