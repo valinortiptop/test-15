@@ -17,13 +17,19 @@ function extractBase64(data: any): string {
     if (!Array.isArray(parts)) return "";
     for (const part of parts) {
       if (part && part.inlineData && part.inlineData.data) {
-        return part.inlineData.data as string;
+        return String(part.inlineData.data);
       }
     }
     return "";
   } catch {
     return "";
   }
+}
+
+function getErrorMessage(fnError: any, data: any): string {
+  if (data && data.error) return String(data.error);
+  if (fnError && fnError.message) return String(fnError.message);
+  return "Failed to generate image. Please try again.";
 }
 
 export default function ImageGenerator() {
@@ -46,13 +52,23 @@ export default function ImageGenerator() {
         },
       });
 
-      if (fnError) throw new Error(fnError.message);
-
       const resData = data as any;
+
+      if (fnError || (resData && resData.error)) {
+        const msg = getErrorMessage(fnError, resData);
+        console.error("generate-image failed:", msg, "raw data:", resData);
+        setError(msg);
+        setLoading(false);
+        return;
+      }
+
       const base64 = extractBase64(resData);
 
       if (!base64) {
-        throw new Error("No image data returned from API.");
+        console.error("No base64 found in response:", JSON.stringify(resData).slice(0, 300));
+        setError("Image was generated but could not be decoded. Please try again.");
+        setLoading(false);
+        return;
       }
 
       const { data: dbRow, error: dbError } = await supabase
@@ -63,21 +79,23 @@ export default function ImageGenerator() {
 
       if (dbError) {
         console.warn("DB insert failed, showing image without saving:", dbError);
-        const tempImage: GeneratedImage = {
-          id: Date.now().toString(),
-          prompt: trimmed,
-          image_base64: base64,
-          created_at: new Date().toISOString(),
-        };
-        setImages((prev) => [tempImage, ...prev]);
+        setImages((prev) => [
+          {
+            id: Date.now().toString(),
+            prompt: trimmed,
+            image_base64: base64,
+            created_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
       } else {
         setImages((prev) => [dbRow as GeneratedImage, ...prev]);
       }
 
       setPrompt("");
     } catch (err: any) {
-      console.error("Image generation error:", err);
-      setError(err.message || "Failed to generate image. Please try again.");
+      console.error("Unexpected image generation error:", err);
+      setError(err.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -138,7 +156,7 @@ export default function ImageGenerator() {
             <Sparkles className="w-8 h-8 text-brand-400 animate-pulse" />
           </div>
           <p className="text-sm text-gray-500 font-medium">Creating your image...</p>
-          <p className="text-xs text-gray-400">This may take 10-20 seconds</p>
+          <p className="text-xs text-gray-400">This may take 10 to 20 seconds</p>
         </div>
       )}
 
