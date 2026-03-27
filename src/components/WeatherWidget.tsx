@@ -39,9 +39,9 @@ const FALLBACK: WeatherData = {
     { time: "+1h", temp: 23, feels_like: 21, humidity: 53, wind_speed: 13, visibility: 10, description: "Partly cloudy", emoji: "⛅" },
     { time: "+2h", temp: 24, feels_like: 22, humidity: 50, wind_speed: 12, visibility: 10, description: "Sunny", emoji: "☀️" },
     { time: "+3h", temp: 25, feels_like: 23, humidity: 48, wind_speed: 11, visibility: 10, description: "Sunny", emoji: "☀️" },
-    { time: "+4h", temp: 24, feels_like: 22, humidity: 52, wind_speed: 13, visibility: 9,  description: "Partly cloudy", emoji: "⛅" },
-    { time: "+5h", temp: 22, feels_like: 20, humidity: 58, wind_speed: 15, visibility: 8,  description: "Cloudy", emoji: "🌥️" },
-    { time: "+6h", temp: 20, feels_like: 18, humidity: 62, wind_speed: 17, visibility: 7,  description: "Light rain", emoji: "🌦️" },
+    { time: "+4h", temp: 24, feels_like: 22, humidity: 52, wind_speed: 13, visibility: 9, description: "Partly cloudy", emoji: "⛅" },
+    { time: "+5h", temp: 22, feels_like: 20, humidity: 58, wind_speed: 15, visibility: 8, description: "Cloudy", emoji: "🌥️" },
+    { time: "+6h", temp: 20, feels_like: 18, humidity: 62, wind_speed: 17, visibility: 7, description: "Light rain", emoji: "🌦️" },
   ],
 };
 
@@ -50,15 +50,15 @@ function toF(c: number) {
 }
 
 function fmt(c: number, u: "C" | "F") {
-  return u === "C" ? c + "°C" : toF(c) + "°F";
+  if (u === "F") return toF(c) + "°F";
+  return c + "°C";
 }
 
 function extractJson(raw: string): string {
-  const s = raw.trim();
-  const start = s.indexOf("{");
-  const end = s.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return s;
-  return s.slice(start, end + 1);
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return raw;
+  return raw.slice(start, end + 1);
 }
 
 export default function WeatherWidget() {
@@ -68,9 +68,12 @@ export default function WeatherWidget() {
   const [selected, setSelected] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchWeather = async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  const fetchWeather = async (isRefresh: boolean) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke("api-handler", {
@@ -95,7 +98,7 @@ export default function WeatherWidget() {
       const resData = data as any;
       const content: string = resData?.choices?.[0]?.message?.content ?? "";
       const jsonStr = extractJson(content);
-      const parsed: WeatherData = JSON.parse(jsonStr);
+      const parsed = JSON.parse(jsonStr) as WeatherData;
 
       if (parsed && parsed.current && Array.isArray(parsed.hourly)) {
         parsed.hourly = parsed.hourly.slice(0, 6);
@@ -111,7 +114,7 @@ export default function WeatherWidget() {
   };
 
   useEffect(() => {
-    fetchWeather();
+    fetchWeather(false);
   }, []);
 
   const shown = selected !== null ? weather.hourly[selected] : weather.current;
@@ -182,10 +185,10 @@ export default function WeatherWidget() {
                   <div className="text-sm text-gray-500 mt-1">
                     {"Feels like " + fmt(shown.feels_like, unit)}
                   </div>
-                  <div className="text-sm font-medium text-gray-700 mt-0.5 flex items-center gap-2">
+                  <div className="text-sm font-medium text-gray-700 mt-0.5">
                     {shown.description}
                     {selected !== null && (
-                      <span className="text-xs text-brand-500 font-semibold bg-brand-50 px-2 py-0.5 rounded-full">
+                      <span className="ml-2 text-xs text-brand-500 font-semibold bg-brand-50 px-2 py-0.5 rounded-full">
                         {"+" + (selected + 1) + "h forecast"}
                       </span>
                     )}

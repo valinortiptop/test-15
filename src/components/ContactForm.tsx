@@ -21,7 +21,8 @@ function buildEmailHtml(name: string): string {
     "<p>We received your message and will get back to you shortly.</p>" +
     "<hr style=\"border:none;border-top:1px solid #e5e7eb;margin:24px 0\">" +
     "<p style=\"color:#9ca3af;font-size:12px\">The Test15 Team</p>" +
-    "<p style=\"color:#9ca3af;font-size:11px\">You received this because you submitted our contact form.</p>" +
+    "<p style=\"color:#9ca3af;font-size:11px\">You received this because you submitted our contact form. " +
+    "<a href=\"https://test15.app/unsubscribe\">Unsubscribe</a></p>" +
     "</div>"
   );
 }

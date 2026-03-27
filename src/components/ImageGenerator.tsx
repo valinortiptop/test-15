@@ -16,7 +16,9 @@ function extractBase64(data: any): string {
     const parts = data?.candidates?.[0]?.content?.parts;
     if (!Array.isArray(parts)) return "";
     for (const part of parts) {
-      if (part?.inlineData?.data) return part.inlineData.data as string;
+      if (part && part.inlineData && part.inlineData.data) {
+        return part.inlineData.data as string;
+      }
     }
     return "";
   } catch {
@@ -144,7 +146,7 @@ export default function ImageGenerator() {
         <div className="flex flex-col items-center justify-center py-16 gap-3 border-2 border-dashed border-gray-200 rounded-xl">
           <ImageIcon className="w-10 h-10 text-gray-300" />
           <p className="text-sm text-gray-400 font-medium">Your generated images will appear here</p>
-          <p className="text-xs text-gray-300">Try: "A serene mountain lake at dawn"</p>
+          <p className="text-xs text-gray-300">Try: A serene mountain lake at dawn</p>
         </div>
       )}
 
