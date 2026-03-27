@@ -1,1 +1,2 @@
-WeatherWidget.tsx:38:88: ERROR: Expected "}" but found end of file
+WeatherWidget.tsx:70:41: ERROR: Unterminated regular expression
+const cleaned = content.replace(/

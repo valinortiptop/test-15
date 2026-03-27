@@ -1,0 +1,3 @@
+\n?/g, "")` regex contains backticks which get interpreted as template literal delimiters by the markdown renderer, corrupting the code before it's committed. The regex is being split across lines and breaking the file.
+
+**The fix:** Replace the regex with `split`/`join` string operations instead — no special characters that can be mangled.
