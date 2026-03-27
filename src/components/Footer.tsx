@@ -91,12 +91,12 @@ function Footer() {
               </li>
               <li className="flex items-start gap-3">
                 <Phone className="w-4 h-4 mt-0.5 text-gray-500 flex-shrink-0" />
-                <span className="text-sm text-gray-400">+1 (555) 123-4567</span>
+                <span className="text-sm text-gray-400">+5255467652</span>
               </li>
               <li className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 mt-0.5 text-gray-500 flex-shrink-0" />
                 <span className="text-sm text-gray-400">
-                  123 Innovation Drive<br />San Francisco, CA 94102
+                  Paseo de la Reforma 333<br />Ciudad de México, CDMX
                 </span>
               </li>
             </ul>
